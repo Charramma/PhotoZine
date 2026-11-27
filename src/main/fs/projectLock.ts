@@ -142,27 +142,46 @@ export async function acquireProjectLock(root: string): Promise<LockOutcome> {
 }
 
 /**
- * 心跳：只有仍属于自己时才续期；被接管后停止续期并通知调用方转只读。
+ * 心跳：只有仍属于自己时才续期；发现被接管就停止续期并通知调用方转只读。
  * `intervalMs` 默认取全局配置，测试可缩短以观察续期与接管。
+ *
+ * 普通文件没有 compare-and-swap：`读 → 写` 之间正好有别人落下锁时，这一次写会盖掉它。
+ * 所以**写完立刻回读验证**，验证不过同样按被接管处理 —— 最坏结果是两边都只读（fail-safe），
+ * 绝不出现"两边都以为自己持有写资格"（D-12）。停止之后绝不再写：已经发出的那一拍
+ * 若还在路上，`stopped` 会让它放弃写入，否则调用方以为停了、锁却被上一拍的迟到写覆盖。
+ * 定宽文本（`PROJECT_LOCK.textWidth`）保证这次原地覆写不会留下上一任的尾巴。
  */
 export function startProjectLockHeartbeat(
   lock: ProjectLock,
   onTakenOver: () => void,
   intervalMs: number = PROJECT_LOCK.heartbeatMs
 ): () => void {
+  let stopped = false
+  const demote = (): void => {
+    if (stopped) return
+    stopped = true
+    clearInterval(timer)
+    onTakenOver()
+  }
   const timer = setInterval(() => {
     void (async () => {
       const existing = await readOwner(lock.file)
+      if (stopped) return
       if (existing === null || !isSelf(existing)) {
-        clearInterval(timer)
-        onTakenOver()
+        demote()
         return
       }
       await writeOver(lock.file, ownOwner()).catch(() => undefined)
+      if (stopped) return
+      const written = await readOwner(lock.file)
+      if (written === null || !isSelf(written)) demote()
     })()
   }, intervalMs)
   timer.unref()
-  return () => clearInterval(timer)
+  return () => {
+    stopped = true
+    clearInterval(timer)
+  }
 }
 
 /** 释放：只删除自己持有的锁，绝不动别人的文件 */
