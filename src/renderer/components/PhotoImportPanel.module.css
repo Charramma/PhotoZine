@@ -1,0 +1,94 @@
+.drop {
+  display: grid;
+  gap: 10px;
+  min-height: 96px;
+  align-content: start;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bar {
+  width: 180px;
+  height: 6px;
+}
+
+.muted {
+  margin: 0;
+  color: var(--pz-ui-muted);
+  font-size: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--pz-ui-muted);
+  font-size: 13px;
+}
+
+.error {
+  margin: 0;
+  color: var(--pz-ui-fail);
+  font-size: 13px;
+}
+
+.notice,
+.summary {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+}
+
+.notice p,
+.summary p {
+  margin: 0;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--pz-ui-muted);
+  font-size: 12px;
+  display: grid;
+  gap: 3px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.failures {
+  width: 100%;
+  font-family: var(--pz-ui-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+  background: var(--pz-ui-surface);
+  color: var(--pz-ui-text);
+  resize: vertical;
+}
+
+.thumbs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.thumb img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+}

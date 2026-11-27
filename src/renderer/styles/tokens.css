@@ -1,0 +1,16 @@
+:root {
+  /* 编辑界面中性色，文字以黑色为主，颜色只用于状态区分（AGENTS.md §4.7） */
+  --pz-ui-bg: #f6f6f5;
+  --pz-ui-surface: #ffffff;
+  --pz-ui-border: #e2e1df;
+  --pz-ui-text: #141414;
+  --pz-ui-muted: #6d6b67;
+  --pz-ui-ok: #1f7a4d;
+  --pz-ui-fail: #a8322b;
+  --pz-ui-pending: #8a7c20;
+
+  --pz-ui-radius: 6px;
+  --pz-ui-gap: 16px;
+  --pz-ui-font: system-ui, 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --pz-ui-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}

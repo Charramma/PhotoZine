@@ -1,0 +1,48 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--pz-ui-bg);
+  color: var(--pz-ui-text);
+  font-family: var(--pz-ui-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+  background: var(--pz-ui-surface);
+  color: var(--pz-ui-text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--pz-ui-muted);
+}
+
+button:disabled {
+  color: var(--pz-ui-muted);
+  cursor: not-allowed;
+}
+
+input,
+select {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+  background: var(--pz-ui-surface);
+  color: var(--pz-ui-text);
+}

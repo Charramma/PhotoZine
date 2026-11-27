@@ -1,0 +1,32 @@
+/*
+ * 打印媒体专用样式，只由打印入口加载（AGENTS.md §3.7）。
+ * 这里只允许放"页与页如何断开、编辑器叠加层如何隐藏"这类打印规则，
+ * 版面几何一律来自 magazine.module.css，禁止在此重定义版面。
+ */
+
+/* T11 起 @page 尺寸由导出配置生成，此处固定 A4 纵向用于开发探针 */
+@page {
+  size: 210mm 297mm;
+  margin: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+/* 全局标记类：与 CSS Modules 的哈希类名并存，使本文件能命中版面元素 */
+.pz-page {
+  break-after: page;
+  break-inside: avoid;
+}
+
+.pz-page:last-child {
+  break-after: auto;
+}
+
+.pz-editor-only {
+  display: none !important;
+}

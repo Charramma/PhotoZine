@@ -1,0 +1,59 @@
+.session {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.identity {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.path {
+  color: var(--pz-ui-muted);
+  font-family: var(--pz-ui-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.count {
+  color: var(--pz-ui-muted);
+  font-size: 13px;
+}
+
+.dirty {
+  color: var(--pz-ui-pending);
+  font-size: 12px;
+}
+
+.readOnly {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--pz-ui-pending);
+  color: var(--pz-ui-pending);
+  font-size: 13px;
+}
+
+.rejection {
+  margin: 0;
+  color: var(--pz-ui-fail);
+  font-size: 13px;
+}
+
+.notices {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--pz-ui-muted);
+  font-size: 12px;
+  display: grid;
+  gap: 3px;
+}

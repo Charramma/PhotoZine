@@ -1,0 +1,30 @@
+.page {
+  position: relative;
+  width: var(--pz-page-w);
+  height: var(--pz-page-h);
+  background: var(--pz-paper);
+  color: var(--pz-ink);
+  font-family: var(--pz-body-font, serif);
+  overflow: hidden;
+}
+
+.slot {
+  position: absolute;
+  overflow: hidden;
+}
+
+.slotImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--pz-fit, cover);
+  object-position: var(--pz-focus, 50% 50%);
+}
+
+.text {
+  position: absolute;
+  overflow: hidden;
+  font-size: var(--pz-font-size, 3.7mm);
+  line-height: var(--pz-line-height, 1.65);
+  text-align: var(--pz-align, left);
+}

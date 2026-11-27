@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PhotoZine">
+  <rect width="512" height="512" rx="112" fill="#233039" />
+  <rect x="104" y="136" width="140" height="240" rx="8" fill="#EEEBE6" />
+  <rect x="268" y="136" width="140" height="240" rx="8" fill="#FFFFFF" />
+  <rect x="292" y="164" width="92" height="92" rx="6" fill="#D98B3A" />
+  <rect x="128" y="164" width="92" height="16" rx="8" fill="#C3CCC2" />
+  <rect x="128" y="196" width="64" height="16" rx="8" fill="#C3CCC2" />
+  <rect x="128" y="292" width="92" height="16" rx="8" fill="#C3CCC2" />
+  <rect x="128" y="324" width="64" height="16" rx="8" fill="#C3CCC2" />
+  <rect x="292" y="276" width="92" height="16" rx="8" fill="#D8DDE1" />
+  <rect x="292" y="308" width="64" height="16" rx="8" fill="#D8DDE1" />
+</svg>

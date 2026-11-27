@@ -1,0 +1,23 @@
+# 依赖
+node_modules/
+
+# 构建产物：electron-vite 的 out/、发布包的 dist/ 与 release/（electron-builder）
+out/
+dist/
+release/
+
+# 增量编译与缓存
+*.tsbuildinfo
+.vite/
+.vitest-cache/
+coverage/
+
+# 日志与本机痕迹
+*.log
+.screenshots/
+.trae-html-share-packages/
+.DS_Store
+Thumbs.db
+desktop.ini
+.env
+.env.*
