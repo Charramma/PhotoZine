@@ -121,6 +121,29 @@ export const IMAGE_PIPELINE = {
 /** 拷贝与哈希共用的读块大小：1MiB */
 export const COPY_CHUNK_BYTES = 1 << 20
 
+/**
+ * 文档自动落盘的防抖窗口（总体设计稿 §7 保存策略）：顺序调整与描述编辑共用这一处，
+ * 不在各组件里各写一份延时。
+ */
+export const PROJECT_SAVE = { debounceMs: 800 } as const
+
+/**
+ * 文件名排序的折叠 locale（需求文档 FR-ORDER-02）。首版界面只有中文一种，
+ * 等 FR-SET-04 落地方言再改成跟随设置，不散落字符串。
+ */
+export const NAME_SORT_LOCALE = 'zh-Hans-CN'
+
+/**
+ * 照片列表的行几何（需求文档 FR-PHOTO-02）：虚拟滚动要求行高固定，所以这个数值由界面侧
+ * 唯一持有并直接写进行内样式，CSS 里不再重复一遍，避免两处真值漂移。
+ */
+export const PHOTO_LIST = {
+  rowHeightPx: 68,
+  thumbEdgePx: 52,
+  overscan: 6,
+  summaryMaxChars: 60
+} as const
+
 /** 编辑器窗口最小尺寸与初始尺寸（需求文档 §7.2） */
 export const EDITOR_WINDOW = {
   minWidth: 1280,

@@ -1,9 +1,27 @@
 .shell {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: var(--pz-rail-width) minmax(0, 1fr);
   gap: var(--pz-ui-gap);
   padding: var(--pz-ui-gap);
+  height: 100%;
+  min-height: 0;
+}
+
+/* 左栏：项目状态 + 照片列表 + 导入入口（需求文档 §6.1 信息架构的第一步） */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--pz-ui-gap);
   align-content: start;
+  min-height: 0;
+  overflow: auto;
 }
 
 .panel {

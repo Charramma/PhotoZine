@@ -12,8 +12,8 @@ import type {
   PhotoImportResult
 } from '@shared/ipc/contract'
 import { onMenuCommand } from '../api/menu'
-import { saveProject } from '../api/project'
 import { filePathOf, importPhotos, pickPhotoFiles, type ImportJob } from '../api/photo'
+import { applyDocumentCommand } from '../store/documentCommands'
 import { useProjectSession } from '../store/projectSession'
 import styles from './PhotoImportPanel.module.css'
 
@@ -45,33 +45,18 @@ export function PhotoImportPanel() {
   const session = useProjectSession((state) => state.session)
   const [stage, setStage] = useState<Stage>({ kind: 'idle' })
   const [job, setJob] = useState<ImportJob | null>(null)
-  const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const cancelled = useRef(false)
 
-  const persist = useCallback(async (photos: PhotoItem[]): Promise<void> => {
-    const current = useProjectSession.getState().session
-    if (current === null) return
-    const next = { ...current.document, photos: [...current.document.photos, ...photos] }
-    useProjectSession.getState().replaceDocument(next)
-    const saved = await saveProject(current.root, next)
-    if (saved.kind === 'saved') {
-      useProjectSession.getState().markSaved(saved.document)
-      setSaveNotice(null)
-      return
-    }
-    setSaveNotice(
-      saved.kind === 'refused'
-        ? saved.reason
-        : saved.kind === 'conflict'
-          ? '磁盘上的项目文件已被外部改动，照片已落盘但文档没有保存，请重新打开项目'
-          : saved.kind === 'rejected'
-            ? `文档校验未通过：${saved.errors.map((error) => error.message).join('；')}`
-            : '项目未打开，文档没有保存'
-    )
+  /**
+   * 原图已经落在 `photos/`，文档不引用它就成孤儿文件（总体设计稿 §7），所以导入成功即并入文档。
+   * 落盘由命令入口统一负责，写盘成败看顶栏的保存状态（FR-EDIT-02）。
+   */
+  const adopt = useCallback((photos: PhotoItem[]): void => {
+    applyDocumentCommand((document) => ({ ...document, photos: [...document.photos, ...photos] }))
   }, [])
 
   const apply = useCallback(
-    async (outcome: PhotoImportResult, files: string[]): Promise<void> => {
+    (outcome: PhotoImportResult, files: string[]): void => {
       switch (outcome.kind) {
         case 'duplicates':
           // 一字节都没写，所以重复清单可以直接摆出来问用户
@@ -81,11 +66,11 @@ export function PhotoImportPanel() {
           setStage({ kind: 'refused', reason: outcome.reason })
           return
         case 'imported':
-          if (outcome.photos.length > 0) await persist(outcome.photos)
+          if (outcome.photos.length > 0) adopt(outcome.photos)
           setStage({ kind: 'summary', photos: outcome.photos, failures: outcome.failures, warnings: outcome.warnings })
       }
     },
-    [persist]
+    [adopt]
   )
 
   const start = useCallback(
@@ -94,7 +79,6 @@ export function PhotoImportPanel() {
       if (current === null || files.length === 0) return
       const hashes = current.document.photos.map((photo) => photo.hash)
       cancelled.current = false
-      setSaveNotice(null)
       setStage({ kind: 'running', done: 0, total: files.length, currentFile: files[0] ?? '', phase: 'hash' })
 
       const started = importPhotos({
@@ -113,7 +97,7 @@ export function PhotoImportPanel() {
       })
       setJob(started)
       try {
-        await apply(await started.result, files)
+        apply(await started.result, files)
       } catch (error) {
         setStage(cancelled.current ? { kind: 'stopped' } : { kind: 'refused', reason: userReason(error) })
       } finally {
@@ -246,8 +230,6 @@ export function PhotoImportPanel() {
           </div>
         </div>
       )}
-
-      {saveNotice !== null && <p className={styles.error}>{saveNotice}</p>}
     </div>
   )
 }

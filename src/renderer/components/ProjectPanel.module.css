@@ -30,8 +30,18 @@
   font-size: 13px;
 }
 
-.dirty {
+.savePending {
   color: var(--pz-ui-pending);
+  font-size: 12px;
+}
+
+.saveFail {
+  color: var(--pz-ui-fail);
+  font-size: 12px;
+}
+
+.saveOk {
+  color: var(--pz-ui-muted);
   font-size: 12px;
 }
 

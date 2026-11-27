@@ -5,10 +5,11 @@ import type { ProjectDocument } from '@shared/domain/project/schema'
 
 /**
  * 编辑器会话里的文档状态（AGENTS.md §4.3）：
- * 只有这一份文档，别的界面元素一律从它派生；改它只走 `replaceDocument`。
+ * 只有这一份文档，别的界面元素一律从它派生；改它只走 `replaceDocument`，
+ * 而 `replaceDocument` 的唯一调用方是命令入口 `documentCommands`（总体设计稿 D-20），
+ * 落盘由它一并触发，成败记在 `saveState`（§7 保存策略）。
  *
- * 撤销栈与命令队列在 T12 落地，届时 `replaceDocument` 的唯一调用方就是命令队列 ——
- * 现在留出这个写入口，是为了避免 T12 再把各处散落的赋值收拢一遍。
+ * 会话本身的建立与清除不在这里发起：真相在主进程，由 `api/project` 的镜像写入（D-21）。
  */
 
 export interface ProjectSession {
@@ -21,14 +22,26 @@ export interface ProjectSession {
   /** 原图已不在 `photos/` 里的照片（I-06），排版时临时摘除 */
   missingPhotoIds: string[]
   dirty: boolean
+  /** 落盘结果（需求文档 FR-EDIT-02）：`dirty` 表示"有改动还没写下去"，这里记"上次写成功/失败" */
+  saveState: SaveState
 }
+
+export type SaveState =
+  | { kind: 'idle' }
+  | { kind: 'saved'; at: number }
+  | { kind: 'error'; reason: string }
 
 interface SessionStore {
   session: ProjectSession | null
   applyOpenOutcome(outcome: OpenOutcome): void
   closeSession(): void
   replaceDocument(document: ProjectDocument): void
-  markSaved(document: ProjectDocument): void
+  /**
+   * 确认落盘成功：只有"内存里还是提交时的那份"才把文档换成磁盘回写的内容并清脏标记；
+   * 保存途中用户又改了，就只记一次成功，脏标记留给下一轮（总体设计稿 §7 保存策略）。
+   */
+  markSaved(submitted: ProjectDocument, saved: ProjectDocument): void
+  markSaveFailed(reason: string): void
 }
 
 const toSession = (project: OpenedProject): ProjectSession => ({
@@ -37,7 +50,8 @@ const toSession = (project: OpenedProject): ProjectSession => ({
   readOnlyReason: project.readOnlyReason,
   notices: [...project.fixes, ...project.warnings],
   missingPhotoIds: project.missingPhotoIds,
-  dirty: false
+  dirty: false,
+  saveState: { kind: 'idle' }
 })
 
 export const useProjectSession = create<SessionStore>((set, get) => ({
@@ -55,9 +69,23 @@ export const useProjectSession = create<SessionStore>((set, get) => ({
     set({ session: { ...session, document, dirty: true } })
   },
 
-  markSaved: (document) => {
+  markSaved: (submitted, saved) => {
     const session = get().session
     if (session === null) return
-    set({ session: { ...session, document, dirty: false } })
+    const unchanged = session.document === submitted
+    set({
+      session: {
+        ...session,
+        document: unchanged ? saved : session.document,
+        dirty: !unchanged,
+        saveState: { kind: 'saved', at: Date.now() }
+      }
+    })
+  },
+
+  markSaveFailed: (reason) => {
+    const session = get().session
+    if (session === null) return
+    set({ session: { ...session, dirty: true, saveState: { kind: 'error', reason } } })
   }
 }))

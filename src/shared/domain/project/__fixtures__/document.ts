@@ -36,6 +36,25 @@ export function makePhoto(index = 0, patch: Partial<PhotoItem> = {}): PhotoItem 
   }
 }
 
+/** 顺序类用例需要 n 张 id 与文件名都互不相同的照片（`makePhoto` 只覆盖 3 个固定 id） */
+export function makePhotoList(count: number, patches: readonly (Partial<PhotoItem> | undefined)[] = []): PhotoItem[] {
+  return Array.from({ length: count }, (_, index) => {
+    const hex = index.toString(16).padStart(8, '0')
+    const id = `${hex}-1111-4111-8111-${hex.padEnd(12, '0')}`
+    return makePhoto(index, { id, fileName: `IMG_${id.slice(0, 8)}.jpg`, ...patches[index] })
+  })
+}
+
+/**
+ * 夹具里的单个取用（`noUncheckedIndexedAccess` 会让下标访问带 `undefined`）：
+ * 越界直接报错，而不是让用例拿到 undefined 后在别处炸开。
+ */
+export function photoAt(photos: readonly PhotoItem[], index: number): PhotoItem {
+  const photo = photos[index]
+  if (photo === undefined) throw new Error(`夹具里没有下标 ${index} 的照片，共 ${photos.length} 张`)
+  return photo
+}
+
 export function makeDocument(overrides: Partial<ProjectDocument> = {}): ProjectDocument {
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,

@@ -103,12 +103,15 @@ export function registerIpcHandlers(): void {
   handle('project:open', async ({ root }) => {
     const outcome = await openProject(root, () => undefined)
     if (outcome.kind === 'opened') grantPzfileRoot(PZFILE_ROOT_PROJECT, outcome.project.root)
+    // 会话由主进程定调，编辑器窗口镜像它：谁发起打开都一样，界面不自己记一份
+    notifyEditor('project:session', outcome)
     return outcome
   })
 
   handle('project:close', async ({ root }) => {
     await closeProject(root)
     revokePzfileRoot(PZFILE_ROOT_PROJECT)
+    notifyEditor('project:closed', { root })
   })
 
   handle('project:save', async ({ root, document }) => saveProject(root, document))

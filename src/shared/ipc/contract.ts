@@ -204,6 +204,12 @@ export const invokeContract = {
 
 /** 主进程 → 渲染进程事件通道 */
 export const eventContract = {
+  /**
+   * 会话的真相在主进程（它持有项目锁与 `pzfile` 授权根）：每次打开/切换项目的结果都通知编辑器窗口，
+   * 界面只镜像这一份，不自己另记（AGENTS.md §4.3 唯一写入口、总体设计稿 D-12）。
+   */
+  'project:session': projectOpenOutcomeSchema,
+  'project:closed': z.object({ root: z.string() }),
   'print-window:ready': z.object({
     windowId: z.number().int(),
     pages: z.number().int(),

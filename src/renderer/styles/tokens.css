@@ -11,6 +11,10 @@
 
   --pz-ui-radius: 6px;
   --pz-ui-gap: 16px;
+  /* 左栏（照片列表）宽度：列表要能看清文件名与摘要，又不能挤走预览区 */
+  --pz-rail-width: 390px;
+  --pz-ui-selected: #eef1f4;
+  --pz-ui-target: #e7ebef;
   --pz-ui-font: system-ui, 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
   --pz-ui-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }

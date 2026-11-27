@@ -3,6 +3,7 @@ import { PAGE_A4, PZFILE_ROOT_APP } from '@shared/domain/constants'
 import type { AppInfo } from '@shared/ipc/contract'
 import { MagazinePage, MagazineSlot } from '@shared/magazine'
 import { PhotoImportPanel } from '../components/PhotoImportPanel'
+import { PhotoList } from '../components/PhotoList'
 import { ProjectPanel } from '../components/ProjectPanel'
 import styles from './EditorView.module.css'
 
@@ -85,112 +86,114 @@ export function EditorView() {
 
   return (
     <div className={styles.shell}>
-      <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>项目与照片</h2>
+      <aside className={styles.rail}>
         <ProjectPanel />
+        <PhotoList />
         <PhotoImportPanel />
-      </section>
+      </aside>
 
-      <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>应用</h2>
-        {info ? (
-          <dl className={styles.kv}>
-            <div>
-              <dt>版本</dt>
-              <dd>
-                {info.name} {info.version}
-              </dd>
-            </div>
-            <div>
-              <dt>运行环境</dt>
-              <dd>
-                Electron {info.electron} · Chrome {info.chrome} · {info.platform}
-              </dd>
-            </div>
-            <div>
-              <dt>打包状态</dt>
-              <dd>{info.packaged ? '已打包' : '开发运行'}</dd>
-            </div>
-            <div>
-              <dt>数据目录</dt>
-              <dd className={styles.mono}>{info.userDataPath}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className={ipcError ? styles.ipcError : styles.muted} data-smoke="ipc-state">
-            {ipcError ? `读取失败：${ipcError}` : '正在通过 IPC 读取主进程信息'}
-          </p>
-        )}
-      </section>
+      <div className={styles.panels}>
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>应用</h2>
+          {info ? (
+            <dl className={styles.kv}>
+              <div>
+                <dt>版本</dt>
+                <dd>
+                  {info.name} {info.version}
+                </dd>
+              </div>
+              <div>
+                <dt>运行环境</dt>
+                <dd>
+                  Electron {info.electron} · Chrome {info.chrome} · {info.platform}
+                </dd>
+              </div>
+              <div>
+                <dt>打包状态</dt>
+                <dd>{info.packaged ? '已打包' : '开发运行'}</dd>
+              </div>
+              <div>
+                <dt>数据目录</dt>
+                <dd className={styles.mono}>{info.userDataPath}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className={ipcError ? styles.ipcError : styles.muted} data-smoke="ipc-state">
+              {ipcError ? `读取失败：${ipcError}` : '正在通过 IPC 读取主进程信息'}
+            </p>
+          )}
+        </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>pzfile 协议</h2>
-        <ul className={styles.probes}>
-          {PROBES.map((probe) => {
-            const state = probeStates[probe.key]
-            const verdict = verdictOf(probe.expect, state)
-            return (
-              <li key={probe.key} className={styles.probe}>
-                <img
-                  className={styles.probeImage}
-                  src={probe.url}
-                  alt=""
-                  onLoad={() => markProbe(probe.key, 'loaded')}
-                  onError={() => markProbe(probe.key, 'failed')}
-                />
-                <span className={styles.probeLabel}>{probe.label}</span>
-                <span
-                  className={[styles.verdict, VERDICT_CLASS[verdict]].join(' ')}
-                  data-smoke-verdict={probe.key}
-                  data-smoke-result={verdict}
-                >
-                  {verdict === 'waiting' ? '等待' : `${PROBE_LABEL[state ?? 'pending']} · ${verdict === 'pass' ? '符合预期' : '不符合预期'}`}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>pzfile 协议</h2>
+          <ul className={styles.probes}>
+            {PROBES.map((probe) => {
+              const state = probeStates[probe.key]
+              const verdict = verdictOf(probe.expect, state)
+              return (
+                <li key={probe.key} className={styles.probe}>
+                  <img
+                    className={styles.probeImage}
+                    src={probe.url}
+                    alt=""
+                    onLoad={() => markProbe(probe.key, 'loaded')}
+                    onError={() => markProbe(probe.key, 'failed')}
+                  />
+                  <span className={styles.probeLabel}>{probe.label}</span>
+                  <span
+                    className={[styles.verdict, VERDICT_CLASS[verdict]].join(' ')}
+                    data-smoke-verdict={probe.key}
+                    data-smoke-result={verdict}
+                  >
+                    {verdict === 'waiting' ? '等待' : `${PROBE_LABEL[state ?? 'pending']} · ${verdict === 'pass' ? '符合预期' : '不符合预期'}`}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>打印窗口</h2>
-        <div className={styles.row}>
-          <label className={styles.field}>
-            页数
-            <input
-              className={styles.pagesInput}
-              type="number"
-              min={1}
-              max={24}
-              value={pages}
-              onChange={(event) => setPages(Math.min(24, Math.max(1, Number(event.target.value) || 1)))}
-            />
-          </label>
-          <button type="button" onClick={openPrintWindow} disabled={printWindowId !== null} data-smoke="open-print">
-            打开
-          </button>
-          <button type="button" onClick={closePrintWindow} disabled={printWindowId === null}>
-            关闭
-          </button>
-          <span className={styles.muted}>{printWindowId === null ? '未打开' : `窗口 ${printWindowId}`}</span>
-        </div>
-        <ul className={styles.events} data-smoke="events">
-          {events.length === 0 ? <li className={styles.muted}>尚无事件</li> : events.map((line) => <li key={line}>{line}</li>)}
-        </ul>
-      </section>
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>打印窗口</h2>
+          <div className={styles.row}>
+            <label className={styles.field}>
+              页数
+              <input
+                className={styles.pagesInput}
+                type="number"
+                min={1}
+                max={24}
+                value={pages}
+                onChange={(event) => setPages(Math.min(24, Math.max(1, Number(event.target.value) || 1)))}
+              />
+            </label>
+            <button type="button" onClick={openPrintWindow} disabled={printWindowId !== null} data-smoke="open-print">
+              打开
+            </button>
+            <button type="button" onClick={closePrintWindow} disabled={printWindowId === null}>
+              关闭
+            </button>
+            <span className={styles.muted}>{printWindowId === null ? '未打开' : `窗口 ${printWindowId}`}</span>
+          </div>
+          <ul className={styles.events} data-smoke="events">
+            {events.length === 0 ? <li className={styles.muted}>尚无事件</li> : events.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        </section>
 
-      <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>版面预览</h2>
-        <div className={styles.pageZoom}>
-          <MagazinePage
-            widthMm={PAGE_A4.widthMm}
-            heightMm={PAGE_A4.heightMm}
-            editorOverlay={<span className={styles.overlayTag}>编辑叠加层 · 打印时隐藏</span>}
-          >
-            <MagazineSlot rect={{ x: 20, y: 24, w: 170, h: 120 }} photoUrl={`${PROBE_BASE}/pzfile-probe.svg`} alt="探针图" />
-          </MagazinePage>
-        </div>
-      </section>
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>版面预览</h2>
+          <div className={styles.pageZoom}>
+            <MagazinePage
+              widthMm={PAGE_A4.widthMm}
+              heightMm={PAGE_A4.heightMm}
+              editorOverlay={<span className={styles.overlayTag}>编辑叠加层 · 打印时隐藏</span>}
+            >
+              <MagazineSlot rect={{ x: 20, y: 24, w: 170, h: 120 }} photoUrl={`${PROBE_BASE}/pzfile-probe.svg`} alt="探针图" />
+            </MagazinePage>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
