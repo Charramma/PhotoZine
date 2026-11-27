@@ -85,6 +85,20 @@ export const IMAGE_FORMAT_LABELS: Record<keyof typeof IMAGE_FORMAT_EXTENSIONS, s
   heic: 'HEIC'
 }
 
+/**
+ * 导入准入表（需求文档 FR-PHOTO-01）：**识别得出**与**允许导入**是两件事，
+ * `IMAGE_FORMAT_EXTENSIONS` 管前者，这张表管后者。
+ * 每一种格式都必须表态（类型强制），不放行的必须给出面向用户的说法 —— 说清下一步怎么办，
+ * 而不是让人以为文件坏了。HEIC 的解码链路已实现并用真机样本验证过，
+ * 因缺 4 类边界样本验收而暂不开放，见总体设计稿 §10.1 挂账 T3-HEIC。
+ */
+export const IMAGE_FORMAT_ADMISSION = {
+  jpeg: { allowed: true },
+  png: { allowed: true },
+  webp: { allowed: true },
+  heic: { allowed: false, reason: 'HEIC 暂不开放导入，可先在手机或系统照片里转成 JPG 再导入' }
+} as const satisfies Record<keyof typeof IMAGE_FORMAT_EXTENSIONS, { allowed: boolean; reason?: string }>
+
 /** 缩略图档（总体设计稿 §5）：列表与网格只用它，界面任何地方不加载原图 */
 export const THUMBNAIL = { longEdgePx: 400, quality: 78 } as const
 

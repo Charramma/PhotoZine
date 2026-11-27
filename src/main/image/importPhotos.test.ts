@@ -190,12 +190,10 @@ describe('逐个失败，不阻断整批', () => {
   })
 
   it('扩展名与内容不符：拒绝，而不是到解码阶段才说不清坏在哪', async () => {
-    const lyingJpeg = await writeSample(sources, '谎报.jpg', { format: 'jpeg', width: 100, height: 100, seed: 10 })
-    const pngRenamed = await writeSample(sources, '假装是 jpeg.png', { format: 'png', width: 100, height: 100, seed: 11 })
-    await writeFile(lyingJpeg + '.heic', await readFile(lyingJpeg))
-    await writeFile(pngRenamed + '.heic', await readFile(pngRenamed))
+    const lyingPng = await writeSample(sources, '谎报.png', { format: 'jpeg', width: 100, height: 100, seed: 10 })
+    const lyingJpeg = await writeSample(sources, '谎报.jpg', { format: 'png', width: 100, height: 100, seed: 11 })
 
-    const result = imported(await request([`${lyingJpeg}.heic`, `${pngRenamed}.heic`]))
+    const result = imported(await request([lyingPng, lyingJpeg]))
 
     expect(result.photos).toEqual([])
     expect(result.failures).toHaveLength(2)
@@ -217,14 +215,15 @@ describe('逐个失败，不阻断整批', () => {
     expect(await namesOf(path.join(root, PROJECT_DIRS.scratch))).toEqual([])
   })
 
-  it('解不开的 HEIC：失败隔离，原始文件也不留在 photos/', async () => {
-    const fake = await writeFakeHeic(sources, '解不开.heic')
+  it('HEIC 在准入阶段就被拒绝：一个字节也不写（总体设计稿 §10.1 挂账 T3-HEIC）', async () => {
+    const fake = await writeFakeHeic(sources, '实况主图.heic')
 
     const result = imported(await request([fake]))
 
     expect(result.photos).toEqual([])
-    expect(result.failures[0]?.reason).toContain('解码')
+    expect(result.failures[0]?.reason).toContain('HEIC')
     expect(await namesOf(path.join(root, PROJECT_DIRS.photos))).toEqual([])
+    expect(await namesOf(path.join(root, PROJECT_DIRS.thumbnails))).toEqual([])
     expect(await namesOf(path.join(root, PROJECT_DIRS.derivedHeic))).toEqual([])
     expect(await namesOf(path.join(root, PROJECT_DIRS.scratch))).toEqual([])
   })

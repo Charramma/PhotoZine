@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatFromFileName, sniffImageFormat } from './imageFormat'
+import { PICKABLE_EXTENSIONS, SUPPORTED_FORMAT_HINT, admissionProblem, formatFromFileName, sniffImageFormat } from './imageFormat'
 
-/** 格式判定只有一个来源：扩展名白名单（需求文档 FR-PHOTO-01）+ 文件头魔数 */
+/**
+ * 格式判定只有一个来源：扩展名白名单（需求文档 FR-PHOTO-01）+ 文件头魔数。
+ * "认得出来"与"允许导入"是两件事，后者见下面的「导入准入」。
+ */
 
 const ascii = (text: string): number[] => [...text].map((ch) => ch.charCodeAt(0))
 const bytes = (...values: number[]): Uint8Array => Uint8Array.from(values)
@@ -51,5 +54,19 @@ describe('sniffImageFormat', () => {
 
   it('文件太短读不出品牌时判为未知', () => {
     expect(sniffImageFormat(bytes(...ascii('ftyp')))).toBeNull()
+  })
+})
+
+describe('导入准入', () => {
+  it('HEIC 认得出来但 M1 不放行，提示要说清下一步（总体设计稿 §10.1 挂账 T3-HEIC）', () => {
+    expect(admissionProblem('heic')).toBe('HEIC 暂不开放导入，可先在手机或系统照片里转成 JPG 再导入')
+    expect(admissionProblem('jpeg')).toBeNull()
+    expect(admissionProblem('png')).toBeNull()
+    expect(admissionProblem('webp')).toBeNull()
+  })
+
+  it('提示语与选择器扩展名都由放行清单派生，不与准入表分叉', () => {
+    expect(SUPPORTED_FORMAT_HINT).toBe('JPG/JPEG、PNG、WebP')
+    expect(PICKABLE_EXTENSIONS).toEqual(['jpg', 'jpeg', 'png', 'webp'])
   })
 })

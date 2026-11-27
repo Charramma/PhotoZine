@@ -4,6 +4,7 @@ import path from 'node:path'
 import { COPY_CHUNK_BYTES, IMAGE_PIPELINE, PROJECT_DIRS } from '@shared/domain/constants'
 import {
   SUPPORTED_FORMAT_HINT,
+  admissionProblem,
   formatFromFileName,
   sniffImageFormat,
   type ImageFormat
@@ -38,7 +39,7 @@ import type {
  * 3. **提交**：整批处理完，把成功条目 `rename` 进正式目录 —— 崩溃或取消只会
  *    留下 `.tmp/` 里的半成品，正式目录里不会出现半个文件（总体设计稿 §7）。
  *
- * 单个文件的失败（坏文件、解不开的 HEIC）只记进 `failures`，不阻断整批；
+ * 单个文件的失败（坏文件、暂不放行的格式）只记进 `failures`，不阻断整批；
  * 环境级错误（磁盘写不进、重命名失败）直接抛出，让界面停下来而不是继续假装成功。
  */
 
@@ -244,12 +245,15 @@ export async function importPhotos(request: ImportPhotosRequest): Promise<Import
   }
 }
 
-/** 阶段 1 的单文件判定：白名单 → 指纹 → 内容格式与扩展名是否一致 */
+/** 阶段 1 的单文件判定：准入 → 指纹 → 内容格式与扩展名是否一致 */
 async function hashOne(sourceFile: string): Promise<HashStep> {
   const extensionFormat = formatFromFileName(path.basename(sourceFile))
   if (extensionFormat === null) {
     return { ok: false, sourceFile, reason: `不支持的文件格式，只支持 ${SUPPORTED_FORMAT_HINT}` }
   }
+  // 认得出来但暂不放行的格式（HEIC，总体设计稿 §10.1）在这里就挡住，给出可执行的说法
+  const deferred = admissionProblem(extensionFormat)
+  if (deferred !== null) return { ok: false, sourceFile, reason: deferred }
   let fingerprint: Fingerprint
   try {
     fingerprint = await fingerprintOf(sourceFile)
@@ -288,6 +292,7 @@ async function stageOne(
     const metadata = await readSourceMetadata(sourceFile)
 
     let geometry: PhotoGeometry
+    // HEIC 通路保留但暂不放行（总体设计稿 §10.1 挂账 T3-HEIC）：准入表翻开前，`hashOne` 已在阶段 1 拦下 `.heic`
     if (format === 'heic') {
       const stagedDecoded = path.join(staging, `${photoId}.decoded.jpg`)
       const derived = await writeHeicDerived(stagedOriginal, {

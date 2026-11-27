@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain } from 'electron'
-import { IMAGE_FORMAT_EXTENSIONS, PZFILE_ROOT_PROJECT } from '@shared/domain/constants'
+import { PZFILE_ROOT_PROJECT } from '@shared/domain/constants'
+import { PICKABLE_EXTENSIONS } from '@shared/domain/photo/imageFormat'
 import {
   eventContract,
   invokeContract,
@@ -56,8 +57,7 @@ async function askOpenDialog(options: Electron.OpenDialogOptions): Promise<Elect
   return owner && !owner.isDestroyed() ? dialog.showOpenDialog(owner, options) : dialog.showOpenDialog(options)
 }
 
-/** 所有图片扩展名摊平成一个列表，供文件选择器过滤；白名单只此一份（AGENTS.md §2.2） */
-const PICKABLE_EXTENSIONS = Object.values(IMAGE_FORMAT_EXTENSIONS).flat()
+/** 所有图片扩展名摊平成一个列表，供文件选择器过滤；由导入准入表派生，白名单只此一份（AGENTS.md §2.2） */
 
 export function registerIpcHandlers(): void {
   handle('app:get-info', () => ({
@@ -94,7 +94,7 @@ export function registerIpcHandlers(): void {
       title: '选择照片',
       buttonLabel: '添加',
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: '照片', extensions: PICKABLE_EXTENSIONS }]
+      filters: [{ name: '照片', extensions: [...PICKABLE_EXTENSIONS] }]
     })
     return { files: picked.canceled ? [] : picked.filePaths }
   })
