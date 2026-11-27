@@ -1,0 +1,83 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.identity,
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pz-ui-muted);
+}
+
+.identity {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.group {
+  display: flex;
+  gap: 6px;
+}
+
+.editable {
+  min-height: 140px;
+  padding: 10px 12px;
+  border: 1px solid var(--pz-ui-border);
+  border-radius: var(--pz-ui-radius);
+  background: var(--pz-ui-surface);
+  line-height: 1.6;
+  outline: none;
+}
+
+.editable:focus {
+  border-color: var(--pz-ui-muted);
+}
+
+/* 只读降级时如实显出不能改的样子，原因由项目状态条常驻说明（AGENTS.md §3.6） */
+.editable[contenteditable='false'] {
+  background: var(--pz-ui-bg);
+  color: var(--pz-ui-muted);
+}
+
+/* 段间距由样式承担：空段落不进契约，所以这里给真段落留出呼吸 */
+.editable p {
+  margin: 0 0 2px;
+}
+
+.editable p:last-child {
+  margin-bottom: 0;
+}
+
+.count {
+  margin: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pz-ui-muted);
+}
+
+/* 同一行字数的两种状态：只换颜色，几何与字号跟着 `.count` 走 */
+.warn {
+  composes: count;
+  color: var(--pz-ui-pending);
+}
+
+.over {
+  composes: count;
+  color: var(--pz-ui-fail);
+}
+
+.notice {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pz-ui-fail);
+}

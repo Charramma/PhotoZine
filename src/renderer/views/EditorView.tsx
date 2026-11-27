@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PAGE_A4, PZFILE_ROOT_APP } from '@shared/domain/constants'
 import type { AppInfo } from '@shared/ipc/contract'
 import { MagazinePage, MagazineSlot } from '@shared/magazine'
+import { DescriptionEditor } from '../components/DescriptionEditor'
 import { PhotoImportPanel } from '../components/PhotoImportPanel'
 import { PhotoList } from '../components/PhotoList'
 import { ProjectPanel } from '../components/ProjectPanel'
@@ -93,6 +94,11 @@ export function EditorView() {
       </aside>
 
       <div className={styles.panels}>
+        <section className={styles.panel} data-smoke="desc-panel">
+          <h2 className={styles.panelTitle}>描述</h2>
+          <DescriptionEditor />
+        </section>
+
         <section className={styles.panel}>
           <h2 className={styles.panelTitle}>应用</h2>
           {info ? (

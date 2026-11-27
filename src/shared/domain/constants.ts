@@ -61,6 +61,20 @@ export const PROJECT_NAME_MAX_LENGTH = 60
 /** 单张照片描述的字符上限（FR-DESC-01） */
 export const DESCRIPTION_MAX_CHARS = 2000
 
+/** 描述字数接近上限时改为显示剩余字数（FR-DESC-01：2000 字上限，1800 起提示） */
+export const DESCRIPTION_WARN_CHARS = 1800
+
+/**
+ * 排版度量（总体设计稿 §4.2 按字计、§4.4 容量公式）的唯一数值来源。
+ * `cjkWeight` / `latinWeight`：一个"字"的折算权重，用于文字分档与容量比较；
+ * `packingFactor`：容量公式的松紧系数，给断行、标点挤压和行首行尾禁则留出余量。
+ */
+export const TEXT_METRICS = {
+  cjkWeight: 1,
+  latinWeight: 0.55,
+  packingFactor: 0.92
+} as const
+
 /** 空槽位的默认裁切视点，版面居中（D-10） */
 export const DEFAULT_FOCUS = 0.5
 

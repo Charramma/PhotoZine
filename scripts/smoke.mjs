@@ -64,6 +64,7 @@ function connect(webSocketDebuggerUrl) {
       })
 
     const session = {
+      send,
       async evaluate(expression) {
         const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
         if (result.exceptionDetails) {
@@ -471,6 +472,294 @@ async function runOrderChecks(editorSession) {
   }
 }
 
+/**
+ * T5 的真实环境验收（需求文档 FR-DESC-01，总体设计稿 D-07、§4.4）：
+ * 描述编辑器作用在真实照片与真实磁盘上，按键、工具条、粘贴、超限都走浏览器的编辑通路，
+ * 断言只认**落盘后的契约结构**与编辑现场的复原结果，不看观感（AGENTS.md §7.4）。
+ */
+
+/** 编辑现场的可断言部分：文本、字数行、提示语、越界样式的痕迹与段落对齐 */
+async function descState(editorSession) {
+  return editorSession.evaluate(
+    `(() => {
+      const el = document.querySelector('[data-smoke="desc-editor"]')
+      if (el === null) return null
+      const paragraphs = [...el.children]
+      return {
+        text: el.innerText.replace(/\\n+$/, ''),
+        count: document.querySelector('[data-smoke="desc-count"]')?.textContent ?? '',
+        notice: document.querySelector('[data-smoke="desc-notice"]')?.textContent ?? '',
+        target: document.querySelector('[data-smoke="desc-target"]')?.textContent ?? '',
+        links: el.querySelectorAll('a').length,
+        underlines: el.querySelectorAll('u').length,
+        colors: paragraphs.concat([...el.querySelectorAll('*')]).filter((node) => /color/i.test(node.getAttribute('style') ?? '')).length,
+        aligns: paragraphs.map((node) => getComputedStyle(node).textAlign)
+      }
+    })()`
+  )
+}
+
+/**
+ * 驱动一次真实编辑：焦点给到编辑区，光标与选区用 DOM Range 摆好，
+ * 内容改动一律用浏览器自己的编辑命令（`insertText` / `bold` / `insertParagraph`…），
+ * 因此 `beforeinput` → `input` → 解析 → 命令入口这条链与用户按键完全同路径。
+ */
+async function editInEditor(editorSession, body) {
+  await editorSession.evaluate(
+    `(() => {
+      const el = document.querySelector('[data-smoke="desc-editor"]')
+      if (el === null) throw new Error('描述编辑器没有挂载')
+      el.focus()
+      const set = (range) => {
+        const selection = window.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+      const toEnd = () => {
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        range.collapse(false)
+        set(range)
+      }
+      const select = (node, from, to) => {
+        const range = document.createRange()
+        range.setStart(node, from)
+        range.setEnd(node, to)
+        set(range)
+      }
+      // 按字选区必须落在文本节点上：浏览器加粗后段落里可能是标记元素，元素上的偏移是子节点序号
+      const textNode = (root) => document.createTreeWalker(root, NodeFilter.SHOW_TEXT).nextNode()
+      ${body}
+    })()`
+  )
+  await sleep(80)
+}
+
+/**
+ * 真按键：经 CDP `Input.dispatchKeyEvent` 打进渲染进程，与用户键盘同一条路。
+ * 输入闸门的断言（超上限、能力集之外的样式）必须走这里 —— `execCommand` 不派发 `beforeinput`，
+ * 拿它测闸门只会测到假阴性；能用 `execCommand` 测的都是"改动本身"，不是"该不该拦"。
+ */
+async function pressKey(editorSession, key, { code, vk, text, modifiers = 0 }) {
+  const base = { key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers }
+  await editorSession.send('Input.dispatchKeyEvent', text === undefined ? { ...base, type: 'keyDown' } : { ...base, type: 'keyDown', text })
+  await editorSession.send('Input.dispatchKeyEvent', { ...base, type: 'keyUp' })
+  await sleep(80)
+}
+
+async function waitForNotice(editorSession, keyword) {
+  return waitFor(
+    `描述编辑器给出"${keyword}"的提示`,
+    async () => {
+      const text = (await descState(editorSession))?.notice ?? ''
+      return text.includes(keyword) ? text : null
+    },
+    8000
+  )
+}
+
+async function runDescriptionChecks(editorSession) {
+  const workspace = await mkdtemp(path.join(tmpdir(), 'pz-smoke-desc-'))
+  try {
+    const projectRoot = path.join(workspace, '描述项目')
+    const cameraCard = path.join(workspace, '相机卡')
+    await mkdir(projectRoot, { recursive: true })
+    await mkdir(cameraCard, { recursive: true })
+    await writeFile(
+      path.join(projectRoot, 'project.json'),
+      JSON.stringify(emptyProject({ name: '描述项目' }), null, 2),
+      'utf8'
+    )
+    const first = path.join(cameraCard, '海边 日落.jpg')
+    const second = path.join(cameraCard, '山雾 清晨.png')
+    await SHARP({ create: { width: 420, height: 280, channels: 3, background: '#8aa6c8' } }).jpeg({ quality: 80 }).toFile(first)
+    await SHARP({ create: { width: 300, height: 400, channels: 3, background: '#9fc08a' } }).png().toFile(second)
+
+    const opened = await callInEditor(editorSession, 'project:open', { root: projectRoot })
+    const imported = await callInEditor(editorSession, 'photo:import', {
+      requestId: randomUUID(),
+      root: projectRoot,
+      files: [first, second],
+      duplicatePolicy: 'ask',
+      existingHashes: []
+    })
+    await callInEditor(editorSession, 'project:save', {
+      root: projectRoot,
+      document: { ...opened.project.document, photos: imported.photos }
+    })
+    await callInEditor(editorSession, 'project:close', { root: projectRoot })
+    await callInEditor(editorSession, 'project:open', { root: projectRoot })
+
+    const pickRow = async (index) => {
+      await editorSession.evaluate(
+        `document.querySelector('[data-photo-index="${index}"]').querySelector('[data-smoke="photo-pick"]').click()`
+      )
+      // 等身份行切过去再留一拍：编辑现场的重建是挂载后的副作用，不能抢在它前面读
+      await waitFor(
+        `描述编辑器切到第 ${index + 1} 张`,
+        async () => {
+          const state = await descState(editorSession)
+          return state !== null && state.target.startsWith(`第 ${index + 1} 张`) ? true : null
+        },
+        10000
+      )
+      await sleep(150)
+    }
+    const readDisk = async () => JSON.parse(await readFile(path.join(projectRoot, 'project.json'), 'utf8'))
+    const diskBlocks = async () => (await readDisk()).photos[0].description.blocks
+
+    await pickRow(0)
+    const start = await descState(editorSession)
+    record(
+      '选中照片即接管它的描述，空描述显示 0 字并说清在编辑第几张',
+      start.text === '' && start.count === '0 / 2000 字' && start.target.startsWith('第 1 张'),
+      `${start.count} · ${start.target}`
+    )
+
+    await editInEditor(editorSession, `toEnd(); document.execCommand('insertText', false, '海边的清晨')`)
+    await waitForSaved(editorSession)
+    const typed = await diskBlocks()
+    record(
+      '键入的文字经解析落进项目文件，形状就是契约的段落与片段',
+      typed.length === 1 && typed[0].runs.length === 1 && typed[0].runs[0].text === '海边的清晨',
+      JSON.stringify(typed)
+    )
+
+    await editInEditor(editorSession, `select(textNode(el.querySelector('p')), 0, 2); document.execCommand('bold')`)
+    await waitForSaved(editorSession)
+    const bolded = await diskBlocks()
+    record(
+      '选区加粗落成片段的 bold 标记，切在片段边界上不丢字',
+      bolded[0].runs[0]?.text === '海边' &&
+        bolded[0].runs[0]?.bold === true &&
+        bolded[0].runs[1]?.text === '的清晨' &&
+        bolded[0].runs[1]?.bold === undefined,
+      JSON.stringify(bolded[0].runs)
+    )
+
+    await editInEditor(editorSession, `toEnd(); document.querySelector('[data-smoke="desc-justifyCenter"]').click()`)
+    await waitForSaved(editorSession)
+    const centered = await diskBlocks()
+    record('工具条的对齐按钮改的是段落对齐，不是字符标记', centered[0].align === 'center', JSON.stringify(centered[0].align))
+
+    await editInEditor(
+      editorSession,
+      `toEnd(); document.execCommand('insertParagraph'); document.execCommand('insertText', false, '山雾还没散')`
+    )
+    await waitForSaved(editorSession)
+    const twoBlocks = await diskBlocks()
+    record('回车另起一段，段与段在契约里是并列的块', twoBlocks.length === 2, `共 ${twoBlocks.length} 段`)
+
+    await editInEditor(
+      editorSession,
+      `toEnd(); document.execCommand('insertLineBreak'); document.execCommand('insertText', false, '风很大')`
+    )
+    await waitForSaved(editorSession)
+    const broken = await diskBlocks()
+    record(
+      'Shift+回车是段内软换行，只给下一段开头记一笔，不另起一段',
+      broken.length === 2 && broken[1].runs.some((run) => run.breakBefore === true),
+      JSON.stringify(broken[1].runs)
+    )
+
+    await editInEditor(
+      editorSession,
+      `toEnd()
+      const store = new DataTransfer()
+      store.setData('text/html', '<p style="color: #ff0000"><b>红字</b> <a href="https://example.com">链接</a></p><p>另一段</p>')
+      store.setData('text/plain', '红字 链接\\n另一段')
+      el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: store }))`
+    )
+    await waitForSaved(editorSession)
+    const pasted = await descState(editorSession)
+    const pastedBlocks = await diskBlocks()
+    const pastedText = JSON.stringify(pastedBlocks)
+    record(
+      '粘贴只取纯文本并保留段落切分，颜色与链接进不了编辑现场也进不了项目文件',
+      pasted.links === 0 &&
+        pasted.colors === 0 &&
+        pastedText.includes('红字 链接') &&
+        pastedBlocks.some((block) => block.runs.some((run) => run.text === '另一段')) &&
+        !pastedText.includes('example.com'),
+      `${pasted.links} 个链接 / ${pasted.colors} 处颜色 / ${pasted.text.replace(/\n/g, ' ⏎ ')}`
+    )
+
+    await editInEditor(editorSession, `toEnd()`)
+    await pressKey(editorSession, 'x', { code: 'KeyX', vk: 88, text: 'x' })
+    await waitForSaved(editorSession)
+    const keyed = await descState(editorSession)
+    const keyedBlocks = await diskBlocks()
+    const lastRun = keyedBlocks.at(-1).runs.at(-1)
+    record(
+      '真键盘敲一个字也解析入库，输入闸门没有误拦正常打字',
+      lastRun.text === '另一段x' && keyed.notice === '',
+      JSON.stringify(lastRun)
+    )
+
+    const baseline = await descState(editorSession)
+    const baselineDisk = JSON.stringify(await diskBlocks())
+
+    await editInEditor(
+      editorSession,
+      `toEnd()
+      const bulk = new DataTransfer()
+      bulk.setData('text/plain', '一'.repeat(2500))
+      el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: bulk }))`
+    )
+    const overflowNotice = await waitForNotice(editorSession, '超过 2000 字上限')
+    const afterOverflow = await descState(editorSession)
+    record(
+      '超过 2000 字的粘贴整个拦在门外：不写盘、不静默截断，并说清下一步',
+      afterOverflow.text === baseline.text &&
+        afterOverflow.count === baseline.count &&
+        JSON.stringify(await diskBlocks()) === baselineDisk,
+      `${afterOverflow.count} · ${overflowNotice}`
+    )
+
+    await editInEditor(editorSession, `select(textNode(el.querySelector('p')), 0, 2)`)
+    await pressKey(editorSession, 'u', { code: 'KeyU', vk: 85, modifiers: 2 })
+    const underlineNotice = await waitForNotice(editorSession, '进不了项目文件')
+    const afterUnderline = await descState(editorSession)
+    record(
+      'Ctrl+U 这类能力集之外的样式在输入边界就被拒，编辑现场不留存不下的半成品',
+      afterUnderline.underlines === 0 &&
+        afterUnderline.text === baseline.text &&
+        JSON.stringify(await diskBlocks()) === baselineDisk,
+      underlineNotice
+    )
+
+    await pickRow(1)
+    const other = await descState(editorSession)
+    await pickRow(0)
+    const back = await descState(editorSession)
+    record(
+      '换照片时编辑现场整份重建，各张的内容互不残留',
+      other.text === '' && other.count === '0 / 2000 字' && back.text === baseline.text,
+      JSON.stringify({ other: other.text, back: back.text })
+    )
+
+    await callInEditor(editorSession, 'project:close', { root: projectRoot })
+    const reopened = await callInEditor(editorSession, 'project:open', { root: projectRoot })
+    await waitFor(
+      '重开后列表渲染完成',
+      async () => (((await editorSession.evaluate(`document.querySelectorAll('[data-photo-index]').length`)) === 2) ? true : null),
+      12000
+    )
+    await pickRow(0)
+    const revived = await descState(editorSession)
+    const diskNow = JSON.stringify(reopened.project.document.photos[0].description.blocks)
+    record(
+      '关闭再重开，描述一字不差地回来，段落对齐在编辑现场复原（T5 出口标准）',
+      revived.text === baseline.text && revived.aligns[0] === 'center' && diskNow === JSON.stringify(await diskBlocks()),
+      `${revived.aligns.join('/')} · ${revived.text.replace(/\n/g, ' ⏎ ')}`
+    )
+
+    await callInEditor(editorSession, 'project:close', { root: projectRoot })
+  } finally {
+    await rm(workspace, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }).catch(() => undefined)
+  }
+}
+
 const app = spawn(ELECTRON_BIN, [process.cwd(), `--remote-debugging-port=${PORT}`, '--remote-allow-origins=*'], {
   stdio: 'inherit'
 })
@@ -535,6 +824,7 @@ try {
 
   await runImportChecks(editorSession)
   await runOrderChecks(editorSession)
+  await runDescriptionChecks(editorSession)
 } catch (error) {
   interruption = error
   if (editorSession) {
